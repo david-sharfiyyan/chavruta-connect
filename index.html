@@ -1,0 +1,1878 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0f1729">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="חברותא">
+<meta name="format-detection" content="telephone=no">
+<meta name="description" content="מצא שותף ללימוד תורה לפי מיקום, נושא ורמה">
+<title>ChavrutaConnect — מציאת חברותא</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  :root{
+    --bg:#0f1729;
+    --bg-soft:#1a2440;
+    --card:#fff;
+    --ink:#1a2440;
+    --ink-soft:#4a5578;
+    --ink-muted:#8a93a8;
+    --accent:#c9a55c;
+    --accent-dark:#a8853f;
+    --accent-soft:#f5ebd4;
+    --line:#e8ecf3;
+    --line-soft:#f0f2f7;
+    --green:#10b981;
+    --red:#ef4444;
+    --blue:#3b82f6;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{
+    min-height:100%;
+    font-family:'Heebo',-apple-system,sans-serif;
+    color:var(--ink);background:#f7f8fb;line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+    overscroll-behavior-y:none;
+    text-size-adjust:100%;-webkit-text-size-adjust:100%;
+  }
+  body{position:relative}
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;min-height:44px}
+  .nav-item,.chip,.filter-chip,.back,.send,.menu-arrow,.toggle-switch{min-height:auto}
+  input,select,textarea{font-family:inherit;font-size:16px}
+  /* prevent iOS auto-zoom on input focus */
+  a{color:inherit;text-decoration:none}
+
+  /* APP SHELL */
+  #app{
+    min-height:100vh;min-height:100dvh;
+    display:flex;flex-direction:column;
+    max-width:480px;margin:0 auto;background:#fff;
+    box-shadow:0 0 60px rgba(15,23,41,.08);
+    position:relative;
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  @media (min-width:520px){
+    body{background:linear-gradient(135deg,#0f1729 0%,#2a3760 100%)}
+    #app{margin:24px auto;border-radius:24px;overflow:hidden;min-height:calc(100vh - 48px);max-height:calc(100vh - 48px);overflow-y:auto}
+  }
+  @supports (-webkit-touch-callout:none){
+    /* iOS Safari fix for 100vh */
+    #app{min-height:-webkit-fill-available}
+  }
+
+  /* TOP BAR */
+  .topbar{
+    position:sticky;top:0;z-index:30;
+    background:#fff;
+    border-bottom:1px solid var(--line);
+    padding:14px 16px;
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+  }
+  .topbar.dark{background:linear-gradient(135deg,#0f1729,#1a2440);color:#fff;border-bottom:none}
+  .topbar h1{font-size:17px;font-weight:700}
+  .topbar .back{
+    width:36px;height:36px;border-radius:10px;
+    background:var(--line-soft);
+    display:flex;align-items:center;justify-content:center;font-size:18px;
+  }
+  .topbar.dark .back{background:rgba(255,255,255,.1);color:#fff}
+
+  /* PAGE */
+  .page{flex:1;padding:0;animation:slide .25s ease}
+  @keyframes slide{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+  /* BOTTOM NAV */
+  .bottom-nav{
+    position:sticky;bottom:0;
+    background:#fff;
+    border-top:1px solid var(--line);
+    display:grid;grid-template-columns:repeat(4,1fr);
+    padding:8px 6px calc(8px + env(safe-area-inset-bottom));
+    z-index:20;
+  }
+  .nav-item{
+    display:flex;flex-direction:column;align-items:center;gap:3px;
+    padding:8px 4px;border-radius:10px;
+    color:var(--ink-muted);font-size:11px;font-weight:500;
+    transition:all .15s;
+  }
+  .nav-item.active{color:var(--accent-dark)}
+  .nav-item .nav-icon{font-size:22px;line-height:1}
+  .nav-item.active .nav-icon{transform:scale(1.1)}
+
+  /* BUTTONS */
+  .btn{
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    padding:14px 20px;border-radius:12px;font-weight:600;font-size:15px;
+    transition:all .15s;width:100%;
+  }
+  .btn-primary{background:var(--ink);color:var(--accent)}
+  .btn-primary:active{transform:scale(.98);background:#000}
+  .btn-secondary{background:var(--accent-soft);color:var(--accent-dark)}
+  .btn-outline{background:#fff;color:var(--ink);border:1.5px solid var(--line)}
+  .btn-ghost{background:transparent;color:var(--ink-soft)}
+  .btn-sm{padding:9px 14px;font-size:13px;border-radius:9px}
+  .btn-pill{border-radius:999px}
+
+  /* WELCOME PAGE */
+  .welcome{
+    background:linear-gradient(135deg,#0f1729 0%,#1a2440 50%,#2a3760 100%);
+    color:#fff;
+    min-height:100vh;min-height:100dvh;
+    display:flex;flex-direction:column;
+    padding:calc(48px + env(safe-area-inset-top)) 28px calc(32px + env(safe-area-inset-bottom));
+    position:relative;overflow:hidden;
+  }
+  .welcome::before{
+    content:"";position:absolute;inset:0;
+    background-image:radial-gradient(circle at 20% 20%,rgba(201,165,92,.2),transparent 50%);
+    pointer-events:none;
+  }
+  .welcome-content{flex:1;display:flex;flex-direction:column;justify-content:center;position:relative;z-index:1}
+  .welcome .logo{
+    width:80px;height:80px;
+    background:linear-gradient(135deg,var(--accent),var(--accent-dark));
+    border-radius:20px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:38px;margin-bottom:24px;
+    box-shadow:0 12px 40px rgba(201,165,92,.3);
+  }
+  .welcome h1{font-size:36px;font-weight:800;margin-bottom:12px;line-height:1.1}
+  .welcome h1 span{color:var(--accent)}
+  .welcome p{color:#cdd5e8;font-size:16px;margin-bottom:32px;font-weight:300;max-width:340px}
+  .welcome-features{display:flex;flex-direction:column;gap:14px;margin-bottom:32px}
+  .welcome-feat{display:flex;gap:12px;align-items:flex-start}
+  .welcome-feat-icon{
+    width:36px;height:36px;
+    background:rgba(201,165,92,.15);
+    color:var(--accent);
+    border-radius:10px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:18px;flex-shrink:0;
+  }
+  .welcome-feat-text{font-size:14.5px;color:#cdd5e8}
+  .welcome-feat-text b{color:#fff;display:block;font-weight:600;font-size:15px}
+  .welcome-actions{display:flex;flex-direction:column;gap:10px;position:relative;z-index:1}
+  .welcome .btn-primary{background:var(--accent);color:var(--ink);font-weight:700}
+  .welcome .btn-outline{background:transparent;border:1.5px solid rgba(255,255,255,.2);color:#fff}
+
+  /* AUTH */
+  .auth-page{padding:24px;min-height:calc(100vh - 60px);min-height:calc(100dvh - 60px);display:flex;flex-direction:column}
+  .auth-page h2{font-size:24px;font-weight:700;margin-bottom:6px}
+  .auth-page .lead{color:var(--ink-soft);margin-bottom:24px;font-size:14.5px}
+  .field{margin-bottom:16px}
+  .field label{display:block;font-size:13px;font-weight:500;color:var(--ink-soft);margin-bottom:6px}
+  .field input,.field select,.field textarea{
+    width:100%;padding:13px 14px;
+    background:#f7f8fb;
+    border:1.5px solid var(--line);
+    border-radius:11px;
+    font-size:16px;color:var(--ink);
+    transition:all .15s;
+    min-height:48px;
+  }
+  .field textarea{min-height:auto}
+  .field input:focus,.field select:focus,.field textarea:focus{
+    outline:none;border-color:var(--accent);background:#fff;
+    box-shadow:0 0 0 4px rgba(201,165,92,.1);
+  }
+  .field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+  /* CHIPS */
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+  .chip{
+    padding:8px 14px;border-radius:999px;
+    background:#f7f8fb;border:1.5px solid var(--line);
+    font-size:13.5px;font-weight:500;color:var(--ink-soft);
+    transition:all .15s;cursor:pointer;
+  }
+  .chip:hover{border-color:var(--accent)}
+  .chip.active{background:var(--ink);color:var(--accent);border-color:var(--ink)}
+
+  /* ONBOARDING */
+  .progress-bar{
+    height:4px;background:var(--line-soft);
+    margin:0 16px 20px;border-radius:999px;overflow:hidden;
+  }
+  .progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-dark));transition:width .3s}
+
+  /* HOME */
+  .home-hero{
+    background:linear-gradient(135deg,#0f1729,#1a2440);
+    color:#fff;padding:24px 20px 32px;
+    border-radius:0 0 24px 24px;
+  }
+  .home-greeting{font-size:14px;color:#cdd5e8;margin-bottom:4px}
+  .home-name{font-size:24px;font-weight:700;margin-bottom:4px}
+  .home-quote{font-size:13px;color:var(--accent);font-style:italic}
+
+  .section{padding:20px 16px}
+  .section-title{font-size:17px;font-weight:700;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center}
+  .section-title a{font-size:13px;color:var(--accent-dark);font-weight:500}
+
+  .path-cards{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:-20px;padding:0 16px;position:relative;z-index:5}
+  .path-card{
+    background:#fff;border-radius:16px;padding:16px;
+    box-shadow:0 8px 24px rgba(15,23,41,.08);
+    text-align:center;cursor:pointer;
+    transition:transform .15s;
+    border:1px solid var(--line-soft);
+  }
+  .path-card:active{transform:scale(.97)}
+  .path-card-icon{
+    width:44px;height:44px;
+    background:linear-gradient(135deg,var(--accent-soft),#fff);
+    border-radius:12px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:22px;margin:0 auto 10px;
+  }
+  .path-card h3{font-size:15px;font-weight:700;margin-bottom:3px}
+  .path-card p{font-size:12px;color:var(--ink-muted)}
+
+  /* CARDS */
+  .card-list{display:flex;flex-direction:column;gap:10px}
+  .person-card{
+    background:#fff;border:1px solid var(--line-soft);border-radius:14px;
+    padding:14px;display:flex;gap:12px;align-items:center;
+    transition:all .15s;cursor:pointer;
+  }
+  .person-card:active{transform:scale(.99);background:#fafbfd}
+  .avatar{
+    width:52px;height:52px;border-radius:14px;
+    background:linear-gradient(135deg,var(--accent),var(--accent-dark));
+    display:flex;align-items:center;justify-content:center;
+    color:#fff;font-weight:700;font-size:18px;flex-shrink:0;
+  }
+  .avatar.female{background:linear-gradient(135deg,#a78bfa,#7c3aed)}
+  .person-info{flex:1;min-width:0}
+  .person-name{font-size:15px;font-weight:700;margin-bottom:2px}
+  .person-meta{font-size:12.5px;color:var(--ink-muted);display:flex;flex-wrap:wrap;gap:6px}
+  .person-meta span:not(:last-child)::after{content:"·";margin-right:6px;color:var(--line)}
+  .person-tags{display:flex;gap:5px;margin-top:5px;flex-wrap:wrap}
+  .tag{
+    font-size:11px;padding:2px 8px;border-radius:999px;
+    background:var(--accent-soft);color:var(--accent-dark);font-weight:500;
+  }
+  .tag.green{background:#d1fae5;color:#065f46}
+  .tag.blue{background:#dbeafe;color:#1e40af}
+  .person-distance{font-size:11px;color:var(--ink-muted);font-weight:500;text-align:left;flex-shrink:0}
+  .match-score{
+    font-size:11px;font-weight:700;padding:4px 8px;border-radius:8px;
+    background:linear-gradient(135deg,var(--accent),var(--accent-dark));color:#fff;
+    margin-bottom:4px;display:inline-block;
+  }
+
+  /* FILTERS */
+  .filters{
+    display:flex;gap:8px;overflow-x:auto;padding:12px 16px;
+    background:#fff;border-bottom:1px solid var(--line-soft);
+    scrollbar-width:none;
+  }
+  .filters::-webkit-scrollbar{display:none}
+  .filter-chip{
+    padding:7px 13px;border-radius:999px;
+    background:#f7f8fb;border:1.5px solid var(--line);
+    font-size:13px;font-weight:500;color:var(--ink-soft);
+    white-space:nowrap;display:flex;align-items:center;gap:5px;
+  }
+  .filter-chip.active{background:var(--ink);color:var(--accent);border-color:var(--ink)}
+
+  /* MAP */
+  #map{height:340px;border-radius:0;background:#e8ecf3}
+  .map-controls{
+    background:#fff;padding:14px 16px;
+    border-bottom:1px solid var(--line-soft);
+  }
+  .radius-control{margin-bottom:8px}
+  .radius-label{display:flex;justify-content:space-between;font-size:13px;font-weight:500;margin-bottom:6px}
+  .radius-label b{color:var(--accent-dark)}
+  input[type=range]{
+    width:100%;height:6px;background:var(--line);
+    border-radius:999px;outline:none;-webkit-appearance:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:22px;height:22px;
+    background:var(--accent);border-radius:50%;cursor:pointer;
+    box-shadow:0 2px 8px rgba(201,165,92,.4);
+  }
+
+  /* PROFILE DETAIL */
+  .profile-hero{
+    background:linear-gradient(135deg,var(--accent),var(--accent-dark));
+    padding:24px 20px;color:#fff;text-align:center;
+    border-radius:0 0 24px 24px;
+  }
+  .profile-avatar{
+    width:96px;height:96px;border-radius:24px;
+    background:rgba(255,255,255,.2);
+    display:flex;align-items:center;justify-content:center;
+    font-size:36px;font-weight:800;margin:0 auto 12px;
+    backdrop-filter:blur(10px);
+  }
+  .profile-hero h2{font-size:22px;font-weight:700;margin-bottom:4px}
+  .profile-hero .meta{font-size:14px;color:rgba(255,255,255,.85)}
+  .profile-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 16px;margin-top:-20px;position:relative;z-index:5}
+  .stat-card{background:#fff;border-radius:12px;padding:12px;text-align:center;box-shadow:0 4px 12px rgba(15,23,41,.06)}
+  .stat-val{font-size:18px;font-weight:700;color:var(--accent-dark)}
+  .stat-lbl{font-size:11px;color:var(--ink-muted);font-weight:500}
+
+  .info-section{padding:20px 16px;border-bottom:1px solid var(--line-soft)}
+  .info-label{font-size:11px;font-weight:600;color:var(--ink-muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px}
+  .info-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:14.5px}
+  .info-row:last-child{margin-bottom:0}
+  .info-row-icon{
+    width:32px;height:32px;border-radius:9px;
+    background:var(--accent-soft);color:var(--accent-dark);
+    display:flex;align-items:center;justify-content:center;font-size:15px;
+  }
+
+  /* CHAT */
+  .chat-header{
+    background:#fff;border-bottom:1px solid var(--line);
+    padding:12px 16px;display:flex;align-items:center;gap:12px;
+    position:sticky;top:0;z-index:10;
+  }
+  .chat-list{display:flex;flex-direction:column}
+  .chat-item{
+    display:flex;gap:12px;align-items:center;
+    padding:12px 16px;border-bottom:1px solid var(--line-soft);
+    cursor:pointer;transition:all .15s;
+  }
+  .chat-item:active{background:var(--line-soft)}
+  .chat-info{flex:1;min-width:0}
+  .chat-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:2px}
+  .chat-name{font-size:14.5px;font-weight:600}
+  .chat-time{font-size:11.5px;color:var(--ink-muted)}
+  .chat-preview{font-size:13px;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .chat-badge{
+    background:var(--accent);color:#fff;font-size:10px;
+    padding:2px 7px;border-radius:999px;font-weight:700;margin-right:6px;
+  }
+
+  .messages{padding:16px;display:flex;flex-direction:column;gap:8px;background:#fafbfd;min-height:calc(100vh - 200px)}
+  .msg{
+    max-width:75%;padding:10px 14px;border-radius:16px;
+    font-size:14.5px;line-height:1.45;
+  }
+  .msg.them{align-self:flex-start;background:#fff;border:1px solid var(--line);border-bottom-right-radius:4px}
+  .msg.me{align-self:flex-end;background:linear-gradient(135deg,var(--ink),#2a3760);color:#fff;border-bottom-left-radius:4px}
+  .msg-time{font-size:10.5px;color:var(--ink-muted);margin-top:2px;padding:0 4px}
+  .msg.me .msg-time{text-align:left}
+
+  .compose{
+    background:#fff;border-top:1px solid var(--line);
+    padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+    display:flex;gap:8px;align-items:center;position:sticky;bottom:0;
+  }
+  .compose input{
+    flex:1;padding:11px 14px;background:#f7f8fb;border:1px solid var(--line);
+    border-radius:999px;font-size:16px;
+  }
+  .compose input:focus{outline:none;border-color:var(--accent)}
+  .compose .send{
+    width:40px;height:40px;border-radius:50%;
+    background:linear-gradient(135deg,var(--accent),var(--accent-dark));
+    color:#fff;font-size:16px;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+  }
+
+  /* MY PROFILE */
+  .my-profile-header{
+    background:linear-gradient(135deg,#0f1729,#1a2440);
+    color:#fff;padding:32px 20px 24px;text-align:center;
+    border-radius:0 0 24px 24px;
+  }
+  .my-profile-avatar{
+    width:88px;height:88px;border-radius:24px;
+    background:linear-gradient(135deg,var(--accent),var(--accent-dark));
+    display:flex;align-items:center;justify-content:center;
+    font-size:34px;font-weight:800;margin:0 auto 12px;
+  }
+  .my-profile-name{font-size:21px;font-weight:700;margin-bottom:2px}
+  .my-profile-email{font-size:13px;color:#cdd5e8}
+
+  .menu{padding:16px}
+  .menu-item{
+    display:flex;align-items:center;gap:14px;padding:14px;
+    background:#fff;border:1px solid var(--line-soft);
+    border-radius:12px;margin-bottom:8px;cursor:pointer;
+    transition:all .15s;
+  }
+  .menu-item:active{background:#fafbfd}
+  .menu-icon{
+    width:38px;height:38px;border-radius:10px;
+    background:var(--accent-soft);color:var(--accent-dark);
+    display:flex;align-items:center;justify-content:center;font-size:16px;
+  }
+  .menu-text{flex:1;font-size:14.5px;font-weight:500}
+  .menu-arrow{color:var(--ink-muted);font-size:18px}
+
+  /* EMPTY STATE */
+  .empty{padding:48px 24px;text-align:center;color:var(--ink-muted)}
+  .empty-icon{font-size:48px;margin-bottom:12px;opacity:.4}
+  .empty-title{font-size:16px;font-weight:600;color:var(--ink);margin-bottom:4px}
+  .empty-text{font-size:13.5px}
+
+  /* TOAST */
+  .toast{
+    position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
+    background:var(--ink);color:#fff;padding:11px 18px;
+    border-radius:999px;font-size:14px;font-weight:500;
+    box-shadow:0 8px 24px rgba(0,0,0,.2);z-index:100;
+    animation:toastIn .3s, toastOut .3s 2.7s forwards;
+  }
+  @keyframes toastIn{from{opacity:0;transform:translate(-50%,20px)}to{opacity:1;transform:translate(-50%,0)}}
+  @keyframes toastOut{to{opacity:0;transform:translate(-50%,20px)}}
+
+  /* MODAL */
+  .modal-overlay{
+    position:fixed;inset:0;background:rgba(15,23,41,.5);z-index:50;
+    display:flex;align-items:flex-end;justify-content:center;
+    animation:fadeIn .2s;
+  }
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  .modal{
+    background:#fff;width:100%;max-width:480px;
+    border-radius:24px 24px 0 0;
+    padding:24px 20px calc(24px + env(safe-area-inset-bottom));
+    animation:slideUp .25s;
+  }
+  @keyframes slideUp{from{transform:translateY(100%)}to{transform:none}}
+  .modal h3{font-size:18px;font-weight:700;margin-bottom:14px;text-align:center}
+
+  /* LOOKING TOGGLE */
+  .looking-card{
+    margin:16px;padding:16px;border-radius:16px;
+    background:linear-gradient(135deg,#fff,var(--accent-soft));
+    border:1.5px solid var(--line);
+    display:flex;align-items:center;gap:12px;
+    transition:all .25s;
+  }
+  .looking-card.active{
+    background:linear-gradient(135deg,#10b981,#059669);
+    border-color:#10b981;color:#fff;
+    box-shadow:0 8px 24px rgba(16,185,129,.3);
+  }
+  .looking-card .icon{
+    width:48px;height:48px;border-radius:14px;
+    background:rgba(255,255,255,.5);
+    display:flex;align-items:center;justify-content:center;font-size:22px;
+    flex-shrink:0;
+  }
+  .looking-card.active .icon{background:rgba(255,255,255,.25)}
+  .looking-card.active .icon::after{
+    content:"";position:absolute;width:48px;height:48px;border-radius:14px;
+    border:2px solid rgba(255,255,255,.6);
+    animation:pulse 1.8s infinite;
+  }
+  @keyframes pulse{0%{transform:scale(1);opacity:1}100%{transform:scale(1.5);opacity:0}}
+  .looking-card .info{flex:1;min-width:0}
+  .looking-card .title{font-weight:700;font-size:15px;margin-bottom:2px}
+  .looking-card .sub{font-size:12.5px;opacity:.85}
+  .looking-card.active .sub{color:rgba(255,255,255,.9)}
+  .toggle-switch{
+    width:50px;height:28px;background:#cbd5e0;border-radius:999px;
+    position:relative;flex-shrink:0;transition:.2s;cursor:pointer;
+  }
+  .toggle-switch.on{background:#fff}
+  .toggle-switch::after{
+    content:"";position:absolute;top:3px;right:3px;
+    width:22px;height:22px;border-radius:50%;background:#fff;
+    transition:.2s;box-shadow:0 2px 6px rgba(0,0,0,.2);
+  }
+  .toggle-switch.on::after{right:auto;left:3px;background:#059669}
+  .live-dot{
+    display:inline-block;width:8px;height:8px;border-radius:50%;
+    background:#10b981;margin-left:4px;vertical-align:middle;
+    box-shadow:0 0 0 3px rgba(16,185,129,.2);
+    animation:livepulse 1.5s infinite;
+  }
+  @keyframes livepulse{0%,100%{box-shadow:0 0 0 3px rgba(16,185,129,.2)}50%{box-shadow:0 0 0 6px rgba(16,185,129,.05)}}
+
+  /* INSTITUTION SEARCH */
+  .inst-search{position:relative}
+  .inst-search-input{
+    width:100%;padding:13px 14px;
+    background:#f7f8fb;border:1.5px solid var(--line);
+    border-radius:11px;font-size:16px;min-height:48px;
+  }
+  .inst-search-input:focus{outline:none;border-color:var(--accent);background:#fff}
+  .inst-dropdown{
+    position:absolute;top:calc(100% + 4px);left:0;right:0;
+    background:#fff;border:1.5px solid var(--line);
+    border-radius:11px;max-height:240px;overflow-y:auto;
+    box-shadow:0 12px 32px rgba(15,23,41,.12);
+    z-index:50;
+  }
+  .inst-option{
+    padding:11px 14px;font-size:14px;cursor:pointer;
+    border-bottom:1px solid var(--line-soft);
+  }
+  .inst-option:hover{background:var(--accent-soft)}
+  .inst-option:last-child{border-bottom:none}
+  .inst-option mark{background:var(--accent-soft);color:var(--accent-dark);padding:1px 3px;border-radius:3px}
+
+  /* SHARE LINK */
+  .share-banner{
+    margin:16px;padding:14px;border-radius:14px;
+    background:linear-gradient(135deg,#eef2ff,#fff);
+    border:1.5px dashed #6366f1;
+    display:flex;gap:12px;align-items:center;
+  }
+  .share-banner .icon{font-size:24px}
+  .share-banner .info{flex:1;min-width:0}
+  .share-banner .title{font-weight:700;font-size:14px;margin-bottom:2px}
+  .share-banner .sub{font-size:12px;color:var(--ink-soft)}
+  .share-banner button{
+    padding:8px 14px;background:#6366f1;color:#fff;border-radius:8px;
+    font-weight:600;font-size:13px;
+  }
+
+  /* DEMO MODE BANNER */
+  .demo-banner{
+    background:#fef3c7;border-bottom:1px solid #fcd34d;
+    padding:8px 16px;font-size:12px;color:#92400e;text-align:center;
+  }
+
+  /* HIDE */
+  .hidden{display:none !important}
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+
+<!-- Firebase SDK -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, serverTimestamp, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+// ⚠️ הדבק כאן את ה-Firebase Config שלך מ:
+// https://console.firebase.google.com/  →  פרויקט  →  הגדרות  →  Web App
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY_HERE",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
+
+const FIREBASE_ENABLED = !firebaseConfig.apiKey.includes("YOUR_");
+window.FIREBASE_ENABLED = FIREBASE_ENABLED;
+
+if(FIREBASE_ENABLED){
+  const fbApp = initializeApp(firebaseConfig);
+  const db = getFirestore(fbApp);
+  window._db = db;
+  window._fb = { collection, doc, setDoc, deleteDoc, onSnapshot, serverTimestamp, query, where };
+}
+</script>
+
+<script>
+// ============================================================
+// REAL USERS — נטען מ-Firestore (או ריק במצב demo)
+// ============================================================
+let PEOPLE = [];
+
+const CHATS = [
+  {personId:1,messages:[
+    {from:"them",text:"שלום! ראיתי את הפרופיל שלך. האם אתה מעוניין ללמוד יחד גמרא?",time:"14:23"},
+    {from:"me",text:"שלום יוסף, בהחלט! איזו מסכת אתה לומד עכשיו?",time:"14:31"},
+    {from:"them",text:"בבא קמא. עברתי כבר שלושה דפים ראשונים. אתה?",time:"14:33"},
+    {from:"me",text:"מעולה - אני בדיוק במקום הזה. אולי נתחיל מחר בבוקר?",time:"14:35"}
+  ],unread:1,lastTime:"14:35"},
+  {personId:3,messages:[
+    {from:"them",text:"שלום, מתעניין בלימוד יחד",time:"אתמול"},
+    {from:"me",text:"בשמחה, מאיזה זמן אתה מתפנה?",time:"אתמול"}
+  ],unread:0,lastTime:"אתמול"},
+  {personId:4,messages:[
+    {from:"them",text:"שלום, האם תרצה ללמוד הלכות שבת?",time:"לפני יומיים"}
+  ],unread:1,lastTime:"לפני יומיים"}
+];
+
+const INSTITUTIONS = [
+  // ישיבות הסדר
+  "ישיבת הסדר עלי","ישיבת הסדר עצמונה","ישיבת הסדר שדרות","ישיבת הסדר מעלה אדומים",
+  "ישיבת הסדר רמת גן","ישיבת הסדר קרית שמונה","ישיבת הסדר ירוחם","ישיבת הסדר חיספין",
+  "ישיבת הסדר קרני שומרון","ישיבת הסדר מחניים","ישיבת הסדר אורות שאול","ישיבת הסדר נתיבות",
+  "ישיבת הסדר פתח תקווה","ישיבת הסדר הר עציון","ישיבת הסדר הכותל","ישיבת הסדר מצפה רמון",
+  "ישיבת הסדר נצר חזני","ישיבת הסדר תקוע","ישיבת הסדר עתניאל","ישיבת הסדר צפת",
+  "ישיבת הסדר אחיה","ישיבת הסדר ראשון לציון","ישיבת הסדר נוה דקלים","ישיבת הסדר אורות יעקב",
+  "ישיבת הסדר אור עציון","ישיבת הסדר מעלות","ישיבת הסדר הגולן",
+  // ישיבות גבוהות (חרדיות)
+  "ישיבת מיר","ישיבת פוניבז׳","ישיבת בריסק","ישיבת חברון","ישיבת סלבודקה",
+  "ישיבת חידושי הרי״ם","ישיבת אור ישראל","ישיבת קול תורה","ישיבת גרודנא",
+  "ישיבת נחלת הלוויים","ישיבת רבינו חיים עוזר","ישיבת בית מתתיהו","ישיבת אור החיים",
+  "ישיבת תורה אור","ישיבת עטרת ישראל","ישיבת קמניץ","ישיבת בעלזא","ישיבת ויז׳ניץ",
+  // ישיבות גבוהות דתי-לאומי
+  "ישיבת מרכז הרב","ישיבת מצפה יריחו","ישיבת בית אל","ישיבת ירושלים לצעירים","ישיבת רמת גן",
+  "ישיבת מעלות","ישיבת הר המור","ישיבת בית אורות","ישיבת רמת השרון","ישיבת קרית ארבע",
+  // מכינות קדם צבאיות
+  "מכינת בני דוד עלי","מכינת יתיר","מכינת קשת יהודה","מכינת רוח השדה","מכינת בית ישראל",
+  "מכינת מצפה רמון","מכינת נצר חזני","מכינת מחניים","מכינת אלישע","מכינת הראל",
+  "מכינת רוח צפת","מכינת קרית מלאכי","מכינת נחשון","מכינת לב הגליל","מכינת תל אביב",
+  "מכינת בני ציון","מכינת עין פרת","מכינת תל חי","מכינת רוח שדה בוקר",
+  // מכינות בנות
+  "מכינה לבנות באר","מכינה לבנות צהלי","מכינה לבנות אש","מכינה לבנות לפיד","מכינת בארות יצחק",
+  // ישיבות תיכוניות
+  "ישיבה תיכונית הר עציון","ישיבה תיכונית עפרה","ישיבה תיכונית מעלה גלבוע",
+  "ישיבה תיכונית קרני שומרון","ישיבה תיכונית נווה שמואל","ישיבה תיכונית מקור חיים",
+  "ישיבה תיכונית בני עקיבא נתיבות","ישיבה תיכונית כפר הרא״ה","ישיבה תיכונית גוש עציון",
+  // מדרשות לבנות
+  "מדרשת מגדל עוז","מדרשת לינדנבאום","מדרשת נשמת","מדרשת תורה ועבודה","מדרשת בית יעקב",
+  "מדרשת הר ברכה","מדרשת בארות","מדרשת אורות יהודה","מדרשת באר","מדרשת בנות תורה",
+  "מדרשת חישבים","מדרשת תורה בציון","מדרשת אור תורה",
+  // כוללים
+  "כולל חזון איש","כולל אבן ישראל","כולל אור התורה","כולל בית מדרש גבוה",
+  "כולל פוניבז׳","כולל מיר","כולל בריסק","כולל הר נוף","כולל אבי עזרי",
+  "כולל קהילת יעקב","כולל זכרון מרדכי","כולל אהל תורה",
+  // בתי כנסת
+  "בית כנסת חב״ד","בית כנסת אהל מאיר","בית כנסת ישורון","בית כנסת היכל שלמה",
+  "בית כנסת רמב״ן","בית כנסת חורבת רבי יהודה החסיד","בית כנסת ישוע ישועות",
+  "בית כנסת המקובלים","בית כנסת זכרון משה",
+  // אחר
+  "ללא מוסד / לומד באופן עצמאי","אחר"
+];
+
+// ============================================================
+// STATE
+// ============================================================
+const defaultState = {
+  authenticated:false,
+  onboarded:false,
+  user:{name:"",email:"",phone:"",gender:"",city:"",institution:"",subjects:[],level:"",lang:[],ageRange:[20,40],format:"",availability:[],bio:"",masechet:"",lookingNow:false,lookingType:"",lat:null,lng:null,locationUpdated:null},
+  view:"welcome",
+  selectedPerson:null,
+  activeChat:null,
+  filters:{subject:"all",level:"all",format:"all"},
+  searchMode:"institutional",
+  radius:5,
+  meetings:[],
+  ratings:{}
+};
+
+let state = loadState();
+
+function loadState(){
+  try{
+    const saved = localStorage.getItem("chavrutaState");
+    if(saved) return {...defaultState,...JSON.parse(saved)};
+  }catch(e){}
+  return {...defaultState};
+}
+function saveState(){
+  try{localStorage.setItem("chavrutaState",JSON.stringify(state));}catch(e){}
+}
+function setState(patch){
+  Object.assign(state,patch);
+  saveState();
+  render();
+}
+
+// ============================================================
+// RENDER
+// ============================================================
+const app = document.getElementById("app");
+
+function render(){
+  const view = state.view;
+  let html = "";
+
+  if(!state.authenticated && view==="welcome") html = renderWelcome();
+  else if(!state.authenticated && view==="signup") html = renderSignup();
+  else if(!state.authenticated && view==="login") html = renderLogin();
+  else if(!state.onboarded) html = renderOnboarding();
+  else if(view==="home") html = renderHome();
+  else if(view==="search-institutional") html = renderInstSearch();
+  else if(view==="search-geographic") html = renderGeoSearch();
+  else if(view==="person") html = renderPersonDetail();
+  else if(view==="chats") html = renderChats();
+  else if(view==="chat") html = renderChat();
+  else if(view==="profile") html = renderMyProfile();
+  else html = renderHome();
+
+  app.innerHTML = html;
+
+  // After render hooks
+  if(view==="search-geographic" && state.authenticated && state.onboarded) initMap();
+}
+
+// ============================================================
+// VIEWS
+// ============================================================
+function renderWelcome(){
+  return `
+    <div class="welcome">
+      <div class="welcome-content">
+        <div class="logo">📖</div>
+        <h1>חברותא<br><span>במרחק לחיצה</span></h1>
+        <p>הפלטפורמה שמחברת בין לומדי תורה — מצא את שותף הלימוד הנכון לך לפי נושא, רמה, ומיקום.</p>
+        <div class="welcome-features">
+          <div class="welcome-feat">
+            <div class="welcome-feat-icon">🎯</div>
+            <div class="welcome-feat-text"><b>התאמה חכמה</b>אלגוריתם שמכיר אותך</div>
+          </div>
+          <div class="welcome-feat">
+            <div class="welcome-feat-icon">🏛️</div>
+            <div class="welcome-feat-text"><b>במוסד שלך או בקרבת מקום</b>שני מסלולי חיפוש</div>
+          </div>
+          <div class="welcome-feat">
+            <div class="welcome-feat-icon">🔒</div>
+            <div class="welcome-feat-text"><b>קהילה מאומתת ובטוחה</b>עם הפרדה מגדרית מלאה</div>
+          </div>
+        </div>
+      </div>
+      <div class="welcome-actions">
+        <button class="btn btn-primary" onclick="go('signup')">התחלה — הרשמה חינמית</button>
+        <button class="btn btn-outline" onclick="go('login')">יש לי חשבון</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderSignup(){
+  return `
+    <div class="topbar">
+      <button class="back" onclick="go('welcome')">›</button>
+      <h1>הרשמה</h1>
+      <div style="width:36px"></div>
+    </div>
+    <div class="auth-page">
+      <h2>ברוכים הבאים</h2>
+      <p class="lead">צור חשבון תוך דקה — נצטרך כמה פרטים בסיסיים.</p>
+      <div class="field">
+        <label>שם מלא</label>
+        <input type="text" id="su-name" placeholder="ישראל ישראלי" autocomplete="name" autocapitalize="words">
+      </div>
+      <div class="field">
+        <label>אימייל</label>
+        <input type="email" id="su-email" placeholder="example@mail.com" autocomplete="email" inputmode="email" dir="ltr" style="text-align:right">
+      </div>
+      <div class="field">
+        <label>מספר טלפון</label>
+        <input type="tel" id="su-phone" placeholder="050-1234567" autocomplete="tel" inputmode="tel" dir="ltr" style="text-align:right">
+      </div>
+      <div class="field">
+        <label>סיסמה</label>
+        <input type="password" id="su-pass" placeholder="לפחות 8 תווים" autocomplete="new-password">
+      </div>
+      <div class="field">
+        <label>מגדר (להפרדה מלאה)</label>
+        <div class="chips" id="su-gender">
+          <div class="chip ${state.user.gender==='m'?'active':''}" onclick="selectChip(this,'#su-gender','m','gender')">גברים</div>
+          <div class="chip ${state.user.gender==='f'?'active':''}" onclick="selectChip(this,'#su-gender','f','gender')">נשים</div>
+        </div>
+      </div>
+      <div style="flex:1"></div>
+      <button class="btn btn-primary" onclick="doSignup()">המשך לבניית פרופיל</button>
+      <p style="text-align:center;font-size:13px;color:var(--ink-muted);margin-top:14px">
+        בלחיצה על "המשך" אתה מסכים ל<a href="#" style="color:var(--accent-dark);font-weight:500">תנאי השימוש</a> ו<a href="#" style="color:var(--accent-dark);font-weight:500">מדיניות הפרטיות</a>
+      </p>
+    </div>
+  `;
+}
+
+function renderLogin(){
+  return `
+    <div class="topbar">
+      <button class="back" onclick="go('welcome')">›</button>
+      <h1>כניסה</h1>
+      <div style="width:36px"></div>
+    </div>
+    <div class="auth-page">
+      <h2>שמחים שחזרת</h2>
+      <p class="lead">היכנס לחשבון שלך והמשך משם.</p>
+      <div class="field">
+        <label>אימייל</label>
+        <input type="email" id="li-email" placeholder="example@mail.com" autocomplete="email" inputmode="email" dir="ltr" style="text-align:right">
+      </div>
+      <div class="field">
+        <label>סיסמה</label>
+        <input type="password" id="li-pass" placeholder="הסיסמה שלך" autocomplete="current-password">
+      </div>
+      <div style="flex:1"></div>
+      <button class="btn btn-primary" onclick="doLogin()">כניסה</button>
+      <button class="btn btn-ghost" onclick="alert('קישור איפוס נשלח לאימייל')">שכחתי סיסמה</button>
+    </div>
+  `;
+}
+
+function renderOnboarding(){
+  const step = state.onboardStep || 1;
+  const total = 5;
+  const pct = (step/total)*100;
+  return `
+    <div class="topbar">
+      ${step>1?`<button class="back" onclick="prevStep()">›</button>`:`<div style="width:36px"></div>`}
+      <h1>בניית פרופיל · ${step}/${total}</h1>
+      <div style="width:36px"></div>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+    <div class="auth-page">
+      ${renderOnboardStep(step)}
+    </div>
+  `;
+}
+
+function renderOnboardStep(step){
+  if(step===1){
+    return `
+      <h2>איפה אתה לומד?</h2>
+      <p class="lead">בחר את המוסד או הקהילה שלך — זה יעזור למצוא חברותא שמכירים את הסגנון שלך.</p>
+      <div class="field">
+        <label>עיר</label>
+        <input type="text" id="ob-city" value="${state.user.city||''}" placeholder="ירושלים, בני ברק...">
+      </div>
+      <div class="field">
+        <label>מוסד / בית כנסת / מכינה <span style="color:var(--ink-muted);font-weight:400">(${INSTITUTIONS.length} מוסדות)</span></label>
+        <div class="inst-search">
+          <input type="text" id="ob-inst-search" class="inst-search-input"
+                 placeholder="הקלד שם — לדוגמה: עלי, עצמונה, שדרות..."
+                 value="${state.user.institution||''}"
+                 oninput="filterInstitutions(this.value)"
+                 onfocus="filterInstitutions(this.value)"
+                 onblur="setTimeout(()=>{const dd=document.getElementById('inst-dropdown');if(dd)dd.remove()},200)">
+          <div id="inst-dropdown-wrap"></div>
+        </div>
+      </div>
+      <div style="flex:1"></div>
+      <button class="btn btn-primary" onclick="saveOnboardStep(1)">המשך</button>
+    `;
+  }
+  if(step===2){
+    const subjects = ["גמרא","הלכה","פרשה","מוסר","תנ״ך","חסידות"];
+    return `
+      <h2>מה אתה לומד?</h2>
+      <p class="lead">בחר את הנושאים שמעניינים אותך (אפשר לבחור כמה).</p>
+      <div class="chips" id="ob-subjects">
+        ${subjects.map(s=>`<div class="chip ${state.user.subjects.includes(s)?'active':''}" onclick="toggleChip(this,'${s}')">${s}</div>`).join('')}
+      </div>
+      <div style="flex:1"></div>
+      <button class="btn btn-primary" onclick="saveOnboardStep(2)">המשך</button>
+    `;
+  }
+  if(step===3){
+    const levels = ["מתחיל","בינוני","מתקדם"];
+    return `
+      <h2>באיזו רמה?</h2>
+      <p class="lead">זה יעזור לנו להתאים לך חברותא ברמה דומה.</p>
+      <div class="chips" id="ob-level">
+        ${levels.map(l=>`<div class="chip ${state.user.level===l?'active':''}" onclick="selectChip(this,'#ob-level','${l}')">${l}</div>`).join('')}
+      </div>
+      <div style="margin-top:24px">
+        <h2 style="font-size:18px;margin-bottom:12px">שפה</h2>
+        <div class="chips" id="ob-lang">
+          ${["עברית","אנגלית","יידיש","אחר"].map(l=>`<div class="chip ${(state.user.lang||[]).includes(l)?'active':''}" onclick="toggleChip(this,'${l}','lang')">${l}</div>`).join('')}
+        </div>
+      </div>
+      <div style="flex:1"></div>
+      <button class="btn btn-primary" onclick="saveOnboardStep(3)">המשך</button>
+    `;
+  }
+  if(step===4){
+    return `
+      <h2>מתי אתה זמין?</h2>
+      <p class="lead">בחר את הזמנים המועדפים עליך ואת הפורמט.</p>
+      <div class="field">
+        <label>זמני לימוד</label>
+        <div class="chips" id="ob-times">
+          ${["בוקר","צהריים","ערב","לילה"].map(t=>`<div class="chip ${(state.user.availability||[]).includes(t)?'active':''}" onclick="toggleChip(this,'${t}','availability')">${t}</div>`).join('')}
+        </div>
+      </div>
+      <div class="field">
+        <label>פורמט מועדף</label>
+        <div class="chips" id="ob-format">
+          ${["פיזי","וירטואלי","שניהם"].map(f=>`<div class="chip ${state.user.format===f?'active':''}" onclick="selectChip(this,'#ob-format','${f}')">${f}</div>`).join('')}
+        </div>
+      </div>
+      <div style="flex:1"></div>
+      <button class="btn btn-primary" onclick="saveOnboardStep(4)">המשך</button>
+    `;
+  }
+  if(step===5){
+    return `
+      <h2>קצת עליך</h2>
+      <p class="lead">תיאור קצר יעזור לחברותא הפוטנציאלי להבין מי אתה.</p>
+      <div class="field">
+        <label>מסכת / ספר נוכחי</label>
+        <input type="text" id="ob-masechet" value="${state.user.masechet||''}" placeholder="לדוגמה: בבא קמא, שולחן ערוך או״ח">
+      </div>
+      <div class="field">
+        <label>תיאור (אופציונלי)</label>
+        <textarea id="ob-bio" rows="4" placeholder="לדוגמה: בחור ישיבה, מחפש חברותא לעיון בגמרא, אוהב שיטת הבריסקאים...">${state.user.bio||''}</textarea>
+      </div>
+      <div style="background:var(--accent-soft);border-radius:12px;padding:16px;margin-top:8px">
+        <div style="font-size:13px;color:var(--accent-dark);font-weight:600;margin-bottom:4px">🎉 הפרופיל כמעט מוכן</div>
+        <div style="font-size:13px;color:var(--ink-soft)">לחיצה על "סיום" תיצור את הפרופיל ותאפשר לך להתחיל למצוא חברותות.</div>
+      </div>
+      <div style="flex:1"></div>
+      <button class="btn btn-primary" onclick="finishOnboarding()">סיום ויצירת פרופיל</button>
+    `;
+  }
+}
+
+function renderHome(){
+  const u = state.user;
+  return `
+    <div class="home-hero">
+      <div class="home-greeting">${getGreeting()}</div>
+      <div class="home-name">${u.name||"אורח"} 👋</div>
+      <div class="home-quote">"כל העוסק בתורה לשמה — זוכה לדברים הרבה"</div>
+    </div>
+    ${!window.FIREBASE_ENABLED?`<div class="demo-banner">⚠️ מצב דמו — הגדר Firebase ב-HTML כדי לראות חברים אמיתיים</div>`:''}
+
+    <div class="share-banner">
+      <div class="icon">📲</div>
+      <div class="info">
+        <div class="title">שלח לחברים בקרבתך</div>
+        <div class="sub">ככל שיותר אנשים — יותר חברותות</div>
+      </div>
+      <button onclick="shareApp()">שתף</button>
+    </div>
+
+    <div class="looking-card ${state.user.lookingNow?'active':''}" onclick="toggleLookingNow()">
+      <div class="icon" style="position:relative">${state.user.lookingNow?'🟢':'⚫'}</div>
+      <div class="info">
+        <div class="title">${state.user.lookingNow?'אתה מחפש חברותא עכשיו':'אינך מחפש כרגע'}</div>
+        <div class="sub">${state.user.lookingNow?`מופיע לאחרים · ${state.user.lookingType||'קבוע'} · נמשך עוד 60 דק'`:'הפעל כדי שאחרים יראו אותך'}</div>
+      </div>
+      <div class="toggle-switch ${state.user.lookingNow?'on':''}"></div>
+    </div>
+
+    <div class="path-cards">
+      <div class="path-card" onclick="go('search-institutional')">
+        <div class="path-card-icon">🏛️</div>
+        <h3>במוסד שלך</h3>
+        <p>חיפוש בישיבה / כולל</p>
+      </div>
+      <div class="path-card" onclick="go('search-geographic')">
+        <div class="path-card-icon">📍</div>
+        <h3>בקרבת מקום</h3>
+        <p>חיפוש לפי רדיוס</p>
+      </div>
+    </div>
+
+    ${(state.meetings||[]).length?`
+      <div class="section">
+        <div class="section-title"><span>📅 המפגשים הקרובים שלי</span></div>
+        <div class="card-list">
+          ${state.meetings.slice(0,3).map(m=>{
+            const p = PEOPLE.find(x=>x.id===m.personId);
+            if(!p) return '';
+            return `
+              <div class="person-card" onclick="openPerson('${p.id}')">
+                <div class="avatar ${p.gender==='f'?'female':''}">${p.name.split(' ').map(x=>x[0]).slice(0,2).join('')}</div>
+                <div class="person-info">
+                  <div class="person-name">${p.name}</div>
+                  <div class="person-meta"><span>${m.date} · ${m.time}</span><span>${m.format}</span></div>
+                  <div class="person-tags"><span class="tag blue">${m.topic}</span></div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `:''}
+
+    <div class="section">
+      <div class="section-title">
+        <span>מחפשי חברותא פעילים ${PEOPLE.length?`(${PEOPLE.length})`:''}</span>
+        ${PEOPLE.length?`<a href="#" onclick="go('search-geographic');return false">הכל ›</a>`:''}
+      </div>
+      <div class="card-list">
+        ${PEOPLE.length
+          ? PEOPLE.sort((a,b)=>a.distance-b.distance).slice(0,5).map(p=>renderPersonCard(p,true)).join('')
+          : renderEmpty('אין מחפשים כרגע','הדלק את הכפתור הירוק למעלה ושתף את הקישור עם חברים')}
+      </div>
+    </div>
+
+    <div style="height:80px"></div>
+    ${renderBottomNav('home')}
+  `;
+}
+
+function renderPersonCard(p,showMatch=false){
+  const initials = p.name.split(' ').map(x=>x[0]).slice(0,2).join('');
+  return `
+    <div class="person-card" onclick="openPerson('${p.id}')">
+      <div style="position:relative;flex-shrink:0">
+        <div class="avatar ${p.gender==='f'?'female':''}">${initials}</div>
+        ${p.lookingNow?`<div style="position:absolute;bottom:-2px;right:-2px;width:14px;height:14px;background:#10b981;border:2px solid #fff;border-radius:50%;box-shadow:0 0 0 2px rgba(16,185,129,.3)"></div>`:''}
+      </div>
+      <div class="person-info">
+        ${showMatch?`<div class="match-score">${p.match}% התאמה</div>`:''}
+        <div class="person-name">${p.name}, ${p.age} ${p.lookingNow?'<span class="live-dot"></span>':''}</div>
+        <div class="person-meta">
+          <span>${p.city}</span>
+          <span>${p.institution}</span>
+        </div>
+        <div class="person-tags">
+          ${p.subjects.slice(0,2).map(s=>`<span class="tag">${s}</span>`).join('')}
+          <span class="tag green">${p.level}</span>
+          ${p.lookingNow&&p.lookingType?`<span class="tag blue">${p.lookingType}</span>`:''}
+        </div>
+      </div>
+      <div class="person-distance">${p.distance} ק״מ</div>
+    </div>
+  `;
+}
+
+function renderInstSearch(){
+  const inst = state.user.institution || "ישיבת מיר";
+  const filtered = PEOPLE.filter(p=>filterMatches(p));
+  return `
+    <div class="topbar">
+      <button class="back" onclick="go('home')">›</button>
+      <h1>חיפוש מוסדי</h1>
+      <div style="width:36px"></div>
+    </div>
+    <div style="padding:16px 16px 0">
+      <div class="field">
+        <label>חיפוש מוסד <span style="color:var(--ink-muted);font-weight:400">(${INSTITUTIONS.length} מוסדות)</span></label>
+        <div class="inst-search">
+          <input type="text" id="srch-inst" class="inst-search-input"
+                 placeholder="עלי, עצמונה, מיר, פוניבז׳..."
+                 value="${state._instSearch||inst||''}"
+                 oninput="searchInst(this.value)">
+          <div id="srch-inst-wrap"></div>
+        </div>
+      </div>
+    </div>
+    ${renderFilters()}
+    <div class="section" style="padding-top:8px">
+      <div class="section-title"><span>${filtered.length} חברותות במוסד</span></div>
+      <div class="card-list">
+        ${filtered.length?filtered.map(p=>renderPersonCard(p,true)).join(''):renderEmpty('אין תוצאות','נסה לשנות את הסינון')}
+      </div>
+    </div>
+    <div style="height:80px"></div>
+    ${renderBottomNav('search')}
+  `;
+}
+
+function renderGeoSearch(){
+  const filtered = PEOPLE.filter(p=>p.distance<=state.radius && filterMatches(p));
+  return `
+    <div class="topbar">
+      <button class="back" onclick="go('home')">›</button>
+      <h1>חיפוש גאוגרפי</h1>
+      <div style="width:36px"></div>
+    </div>
+    <div id="map"></div>
+    <div class="map-controls">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:12.5px;color:var(--ink-muted)">
+        <span>${state.user.lat?`📍 מיקומך: ${state.user.lat.toFixed(4)}, ${state.user.lng.toFixed(4)}`:'📍 מיקום לא זמין'}</span>
+        <button onclick="refreshLocation()" style="font-size:12px;color:var(--accent-dark);font-weight:600">🔄 עדכן</button>
+      </div>
+      <div class="radius-control">
+        <div class="radius-label"><span>רדיוס חיפוש</span><b>${state.radius} ק״מ</b></div>
+        <input type="range" min="1" max="60" value="${state.radius}" oninput="updateRadius(this.value)">
+      </div>
+    </div>
+    ${renderFilters()}
+    <div class="section" style="padding-top:8px">
+      <div class="section-title"><span>${filtered.length} חברותות בטווח</span></div>
+      <div class="card-list">
+        ${filtered.length?filtered.sort((a,b)=>a.distance-b.distance).map(p=>renderPersonCard(p,true)).join(''):renderEmpty('אין תוצאות באזור','נסה להגדיל את הרדיוס')}
+      </div>
+    </div>
+    <div style="height:80px"></div>
+    ${renderBottomNav('search')}
+  `;
+}
+
+function renderFilters(){
+  return `
+    <div class="filters">
+      <button class="filter-chip ${state.filters.lookingType==='קבוע'?'active':''}" onclick="setFilter('lookingType','קבוע')">🟢 קבוע</button>
+      <button class="filter-chip ${state.filters.lookingType==='חד-פעמי'?'active':''}" onclick="setFilter('lookingType','חד-פעמי')">🟢 חד-פעמי</button>
+      <button class="filter-chip ${state.filters.subject==='all'?'active':''}" onclick="setFilter('subject','all')">כל הנושאים</button>
+      <button class="filter-chip ${state.filters.subject==='גמרא'?'active':''}" onclick="setFilter('subject','גמרא')">גמרא</button>
+      <button class="filter-chip ${state.filters.subject==='הלכה'?'active':''}" onclick="setFilter('subject','הלכה')">הלכה</button>
+      <button class="filter-chip ${state.filters.subject==='תנ״ך'?'active':''}" onclick="setFilter('subject','תנ״ך')">תנ״ך</button>
+      <button class="filter-chip ${state.filters.level==='מתקדם'?'active':''}" onclick="setFilter('level','מתקדם')">מתקדם</button>
+      <button class="filter-chip ${state.filters.level==='בינוני'?'active':''}" onclick="setFilter('level','בינוני')">בינוני</button>
+      <button class="filter-chip ${state.filters.format==='וירטואלי'?'active':''}" onclick="setFilter('format','וירטואלי')">וירטואלי</button>
+    </div>
+    <div style="background:#ecfdf5;border-bottom:1px solid #d1fae5;padding:8px 16px;font-size:12px;color:#065f46;display:flex;align-items:center;gap:6px">
+      <span class="live-dot"></span> מציג רק מחפשים פעילים עכשיו
+    </div>
+  `;
+}
+
+function renderPersonDetail(){
+  const p = PEOPLE.find(x=>x.id===state.selectedPerson);
+  if(!p) return renderHome();
+  const initials = p.name.split(' ').map(x=>x[0]).slice(0,2).join('');
+  return `
+    <div class="topbar dark">
+      <button class="back" onclick="go(state._prevView||'home')">›</button>
+      <h1>פרופיל</h1>
+      <button class="back" onclick="toast('הפרופיל נשמר במועדפים ⭐')">★</button>
+    </div>
+    <div class="profile-hero">
+      <div class="profile-avatar">${initials}</div>
+      <h2>${p.name}</h2>
+      <div class="meta">${p.age} · ${p.city}</div>
+    </div>
+    <div class="profile-stats">
+      <div class="stat-card"><div class="stat-val">${p.match}%</div><div class="stat-lbl">התאמה</div></div>
+      <div class="stat-card"><div class="stat-val">${p.distance}</div><div class="stat-lbl">ק״מ</div></div>
+      <div class="stat-card"><div class="stat-val">${p.level}</div><div class="stat-lbl">רמה</div></div>
+    </div>
+    <div class="info-section" style="margin-top:12px">
+      <div class="info-label">על עצמי</div>
+      <p style="font-size:14.5px;color:var(--ink-soft);line-height:1.6">${p.bio}</p>
+    </div>
+    <div class="info-section">
+      <div class="info-label">פרטי לימוד</div>
+      <div class="info-row"><div class="info-row-icon">🏛️</div><span>${p.institution}</span></div>
+      <div class="info-row"><div class="info-row-icon">📚</div><span>${p.subjects.join(', ')}</span></div>
+      <div class="info-row"><div class="info-row-icon">🌐</div><span>${p.lang}</span></div>
+      <div class="info-row"><div class="info-row-icon">⏰</div><span>${p.availability}</span></div>
+      <div class="info-row"><div class="info-row-icon">💬</div><span>${p.format}</span></div>
+    </div>
+    <div style="padding:16px;display:flex;gap:10px">
+      <button class="btn btn-outline" style="flex:1" onclick="toast('פנייה נשלחה')">סימון עניין</button>
+      <button class="btn btn-primary" style="flex:1" onclick="startChat('${p.id}')">שלח הודעה</button>
+    </div>
+    <div style="height:20px"></div>
+  `;
+}
+
+function renderChats(){
+  return `
+    <div class="topbar"><div style="width:36px"></div><h1>הודעות</h1><div style="width:36px"></div></div>
+    <div class="chat-list">
+      ${CHATS.filter(c=>PEOPLE.find(x=>x.id===c.personId)).map(c=>{
+        const p = PEOPLE.find(x=>x.id===c.personId);
+        const last = c.messages[c.messages.length-1];
+        const initials = p.name.split(' ').map(x=>x[0]).slice(0,2).join('');
+        return `
+          <div class="chat-item" onclick="openChat('${p.id}')">
+            <div class="avatar ${p.gender==='f'?'female':''}">${initials}</div>
+            <div class="chat-info">
+              <div class="chat-top">
+                <span class="chat-name">${p.name}</span>
+                <span class="chat-time">${c.lastTime}</span>
+              </div>
+              <div class="chat-preview">${last.from==='me'?'אתה: ':''}${last.text}</div>
+            </div>
+            ${c.unread>0?`<span class="chat-badge">${c.unread}</span>`:''}
+          </div>
+        `;
+      }).join('')}
+    </div>
+    ${CHATS.length===0?renderEmpty('אין הודעות עדיין','התחל לפנות לחברותות שמצאת'):''}
+    <div style="height:80px"></div>
+    ${renderBottomNav('chats')}
+  `;
+}
+
+function renderChat(){
+  const p = PEOPLE.find(x=>x.id===state.activeChat);
+  const chat = CHATS.find(c=>c.personId===state.activeChat) || {messages:[]};
+  if(!p) return renderChats();
+  const initials = p.name.split(' ').map(x=>x[0]).slice(0,2).join('');
+  return `
+    <div class="chat-header">
+      <button class="back" onclick="go('chats')" style="width:32px;height:32px;border-radius:8px;background:var(--line-soft);display:flex;align-items:center;justify-content:center">›</button>
+      <div class="avatar ${p.gender==='f'?'female':''}" style="width:40px;height:40px;font-size:14px">${initials}</div>
+      <div style="flex:1">
+        <div style="font-size:15px;font-weight:600">${p.name}</div>
+        <div style="font-size:12px;color:var(--green)">פעיל עכשיו</div>
+      </div>
+      <button class="back" onclick="openPerson('${p.id}')" style="width:32px;height:32px;border-radius:8px;background:var(--line-soft);display:flex;align-items:center;justify-content:center">ⓘ</button>
+    </div>
+    <div class="messages" id="messages">
+      ${chat.messages.map(m=>`
+        <div>
+          <div class="msg ${m.from}">${m.text}</div>
+          <div class="msg-time">${m.time}</div>
+        </div>
+      `).join('')}
+    </div>
+    <div style="padding:8px 12px;background:#fafbfd;border-top:1px solid var(--line-soft);display:flex;gap:8px;overflow-x:auto">
+      <button class="filter-chip active" onclick="openMeetingModal(${p.id})" style="background:var(--accent-soft);color:var(--accent-dark);border-color:var(--accent-soft);font-weight:600">📅 קבע מפגש</button>
+      <button class="filter-chip" onclick="openRatingModal(${p.id})">⭐ דירוג ומשוב</button>
+      <button class="filter-chip" onclick="toast('שיתוף לוח זמנים — בקרוב')">🗓️ שתף לוז</button>
+    </div>
+    <div class="compose">
+      <input type="text" id="msg-input" placeholder="כתוב הודעה..." onkeypress="if(event.key==='Enter')sendMsg()">
+      <button class="send" onclick="sendMsg()">▲</button>
+    </div>
+  `;
+}
+
+function openMeetingModal(personId){
+  const p = PEOPLE.find(x=>x.id===personId);
+  const today = new Date().toISOString().split('T')[0];
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.onclick = (e)=>{ if(e.target===overlay) overlay.remove(); };
+  overlay.innerHTML = `
+    <div class="modal" onclick="event.stopPropagation()">
+      <h3>קביעת מפגש עם ${p.name}</h3>
+      <div class="field">
+        <label>תאריך</label>
+        <input type="date" id="meet-date" min="${today}" value="${today}">
+      </div>
+      <div class="field">
+        <label>שעה</label>
+        <input type="time" id="meet-time" value="20:00">
+      </div>
+      <div class="field">
+        <label>מסכת / נושא</label>
+        <input type="text" id="meet-topic" placeholder="לדוגמה: בבא קמא דף ב">
+      </div>
+      <div class="field">
+        <label>פורמט</label>
+        <div class="chips" id="meet-format">
+          <div class="chip active" onclick="document.querySelectorAll('#meet-format .chip').forEach(c=>c.classList.remove('active'));this.classList.add('active');this.dataset.sel='1'">פיזי</div>
+          <div class="chip" onclick="document.querySelectorAll('#meet-format .chip').forEach(c=>c.classList.remove('active'));this.classList.add('active');this.dataset.sel='1'">וירטואלי (זום)</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:8px">
+        <button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">ביטול</button>
+        <button class="btn btn-primary" onclick="confirmMeeting(${personId},this)">קבע מפגש</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+
+function confirmMeeting(personId,btn){
+  const date = document.getElementById('meet-date').value;
+  const time = document.getElementById('meet-time').value;
+  const topic = document.getElementById('meet-topic').value.trim() || 'לימוד';
+  const fmt = document.querySelector('#meet-format .chip.active').textContent;
+  if(!date||!time){alert('נא למלא תאריך ושעה');return}
+  state.meetings = state.meetings || [];
+  state.meetings.push({personId,date,time,topic,format:fmt});
+  const chat = CHATS.find(c=>c.personId===personId);
+  if(chat){
+    chat.messages.push({from:'me',text:`📅 הזמנה למפגש: ${date} בשעה ${time} · ${topic} (${fmt})`,time:'עכשיו'});
+    chat.lastTime = 'עכשיו';
+  }
+  saveState();
+  btn.closest('.modal-overlay').remove();
+  toast('✅ המפגש נקבע ונשלחה הודעה');
+  render();
+}
+
+function openRatingModal(personId){
+  const p = PEOPLE.find(x=>x.id===personId);
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.onclick = (e)=>{ if(e.target===overlay) overlay.remove(); };
+  overlay.innerHTML = `
+    <div class="modal" onclick="event.stopPropagation()">
+      <h3>דירוג חברותא — ${p.name}</h3>
+      <p style="text-align:center;font-size:13.5px;color:var(--ink-muted);margin-bottom:18px">המשוב שלך משפר את אלגוריתם ההתאמה</p>
+      <div style="text-align:center;margin-bottom:18px;font-size:36px" id="stars">
+        ${[1,2,3,4,5].map(n=>`<span data-n="${n}" onclick="rateStar(${n})" style="cursor:pointer;color:#e0e0e0;transition:.15s">★</span>`).join('')}
+      </div>
+      <div class="field">
+        <label>מה היה טוב? (אופציונלי)</label>
+        <textarea id="rate-comment" rows="3" placeholder="הערות לשיפור ההתאמה..."></textarea>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:8px">
+        <button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">ביטול</button>
+        <button class="btn btn-primary" onclick="submitRating(${personId},this)">שלח משוב</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  window._currentRating = 0;
+}
+
+function rateStar(n){
+  window._currentRating = n;
+  document.querySelectorAll('#stars span').forEach((s,i)=>{
+    s.style.color = i<n ? '#c9a55c' : '#e0e0e0';
+  });
+}
+
+function submitRating(personId,btn){
+  const rating = window._currentRating || 0;
+  if(rating===0){alert('נא לבחור דירוג');return}
+  const comment = document.getElementById('rate-comment').value.trim();
+  state.ratings = state.ratings || {};
+  state.ratings[personId] = {rating,comment,date:new Date().toISOString()};
+  saveState();
+  btn.closest('.modal-overlay').remove();
+  toast(`⭐ תודה על המשוב (${rating}/5)`);
+}
+
+function renderMyProfile(){
+  const u = state.user;
+  const initials = (u.name||"א").split(' ').map(x=>x[0]).slice(0,2).join('');
+  return `
+    <div class="my-profile-header">
+      <div class="my-profile-avatar">${initials}</div>
+      <div class="my-profile-name">${u.name||"משתמש"}</div>
+      <div class="my-profile-email">${u.email||""}</div>
+    </div>
+    <div class="profile-stats" style="margin-top:-20px">
+      <div class="stat-card"><div class="stat-val">${u.subjects.length}</div><div class="stat-lbl">נושאים</div></div>
+      <div class="stat-card"><div class="stat-val">${(state.meetings||[]).length}</div><div class="stat-lbl">מפגשים</div></div>
+      <div class="stat-card"><div class="stat-val">${CHATS.length}</div><div class="stat-lbl">שיחות</div></div>
+    </div>
+
+    <div class="info-section" style="margin-top:16px">
+      <div class="info-label">הפרופיל שלי</div>
+      <div class="info-row"><div class="info-row-icon">🏛️</div><span>${u.institution||"לא הוגדר"}</span></div>
+      <div class="info-row"><div class="info-row-icon">📚</div><span>${u.subjects.join(', ')||"לא הוגדר"}</span></div>
+      <div class="info-row"><div class="info-row-icon">📖</div><span>מסכת נוכחית: ${u.masechet||"לא הוגדר"}</span></div>
+      <div class="info-row"><div class="info-row-icon">📊</div><span>רמה: ${u.level||"לא הוגדר"}</span></div>
+      <div class="info-row"><div class="info-row-icon">⏰</div><span>${(u.availability||[]).join(', ')||"לא הוגדר"}</span></div>
+      <div class="info-row"><div class="info-row-icon">${u.gender==='f'?'👩':'👨'}</div><span>${u.gender==='f'?'נשים':'גברים'} (הפרדה מלאה)</span></div>
+    </div>
+
+    <div class="menu">
+      <div class="menu-item" onclick="toast('פתיחת עריכת פרופיל')"><div class="menu-icon">✎</div><div class="menu-text">ערוך פרופיל</div><div class="menu-arrow">›</div></div>
+      <div class="menu-item" onclick="toast('הגדרות התראות')"><div class="menu-icon">🔔</div><div class="menu-text">התראות</div><div class="menu-arrow">›</div></div>
+      <div class="menu-item" onclick="toast('הגדרות פרטיות')"><div class="menu-icon">🔒</div><div class="menu-text">פרטיות ובטיחות</div><div class="menu-arrow">›</div></div>
+      <div class="menu-item" onclick="toast('עזרה ותמיכה')"><div class="menu-icon">❓</div><div class="menu-text">עזרה</div><div class="menu-arrow">›</div></div>
+      <div class="menu-item" onclick="logout()" style="color:var(--red)"><div class="menu-icon" style="background:#fee2e2;color:var(--red)">↩</div><div class="menu-text">יציאה</div><div class="menu-arrow">›</div></div>
+    </div>
+    <div style="height:80px"></div>
+    ${renderBottomNav('profile')}
+  `;
+}
+
+function renderBottomNav(active){
+  const items = [
+    {key:'home',icon:'🏠',label:'בית'},
+    {key:'search',icon:'🔍',label:'חיפוש'},
+    {key:'chats',icon:'💬',label:'הודעות'},
+    {key:'profile',icon:'👤',label:'אני'}
+  ];
+  return `
+    <div class="bottom-nav">
+      ${items.map(i=>`
+        <button class="nav-item ${active===i.key?'active':''}" onclick="navTo('${i.key}')">
+          <div class="nav-icon">${i.icon}</div>
+          <div>${i.label}</div>
+        </button>
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderEmpty(title,text){
+  return `<div class="empty"><div class="empty-icon">🔍</div><div class="empty-title">${title}</div><div class="empty-text">${text}</div></div>`;
+}
+
+// ============================================================
+// LOGIC
+// ============================================================
+function go(view){
+  state._prevView = state.view;
+  setState({view});
+  window.scrollTo(0,0);
+}
+
+function navTo(key){
+  if(key==='home') go('home');
+  else if(key==='search') go('search-geographic');
+  else if(key==='chats') go('chats');
+  else if(key==='profile') go('profile');
+}
+
+function getGreeting(){
+  const h = new Date().getHours();
+  if(h<12) return "בוקר טוב";
+  if(h<17) return "אחר הצהריים טובים";
+  if(h<20) return "ערב טוב";
+  return "לילה טוב";
+}
+
+function doSignup(){
+  const name = document.getElementById('su-name').value.trim();
+  const email = document.getElementById('su-email').value.trim();
+  const phone = document.getElementById('su-phone').value.trim();
+  const pass = document.getElementById('su-pass').value;
+  if(!name||!email||!phone||pass.length<8){alert('נא למלא את כל השדות (סיסמה חזקה לפחות 8 תווים)');return}
+  if(!state.user.gender){alert('נא לבחור מגדר (חיוני להפרדה)');return}
+  state.user.name = name;
+  state.user.email = email;
+  state.user.phone = phone;
+  state.authenticated = true;
+  state.onboardStep = 1;
+  setState({});
+}
+
+function doLogin(){
+  const email = document.getElementById('li-email').value.trim();
+  const pass = document.getElementById('li-pass').value;
+  if(!email||!pass){alert('נא למלא אימייל וסיסמה');return}
+  state.user.email = email;
+  state.user.name = state.user.name || "משתמש";
+  state.authenticated = true;
+  state.onboarded = true;
+  if(!state.user.subjects.length) state.user.subjects = ["גמרא"];
+  if(!state.user.level) state.user.level = "בינוני";
+  setState({view:'home'});
+}
+
+function logout(){
+  if(confirm('האם להתנתק?')){
+    localStorage.removeItem('chavrutaState');
+    state = {...defaultState};
+    render();
+  }
+}
+
+function toggleChip(el,val,key){
+  el.classList.toggle('active');
+  if(key){
+    state.user[key] = state.user[key]||[];
+    const idx = state.user[key].indexOf(val);
+    if(idx>=0) state.user[key].splice(idx,1);
+    else state.user[key].push(val);
+  } else {
+    const idx = state.user.subjects.indexOf(val);
+    if(idx>=0) state.user.subjects.splice(idx,1);
+    else state.user.subjects.push(val);
+  }
+  saveState();
+}
+
+function selectChip(el,parent,val,key){
+  document.querySelectorAll(`${parent} .chip`).forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  if(key){ state.user[key] = val; }
+  else if(parent.includes('level')) state.user.level = val;
+  else if(parent.includes('format')) state.user.format = val;
+  saveState();
+}
+
+function filterInstitutions(q){
+  const wrap = document.getElementById('inst-dropdown-wrap');
+  if(!wrap) return;
+  const term = (q||'').trim();
+  const matches = term
+    ? INSTITUTIONS.filter(i=>i.includes(term)).slice(0,40)
+    : INSTITUTIONS.slice(0,40);
+  if(matches.length===0){
+    wrap.innerHTML = `<div id="inst-dropdown" class="inst-dropdown"><div class="inst-option" style="color:var(--ink-muted)">אין תוצאות — בחר "אחר"</div></div>`;
+    return;
+  }
+  wrap.innerHTML = `<div id="inst-dropdown" class="inst-dropdown">
+    ${matches.map(i=>{
+      const highlighted = term ? i.replace(term,`<mark>${term}</mark>`) : i;
+      return `<div class="inst-option" onclick="pickInstitution('${i.replace(/'/g,"\\'")}')">${highlighted}</div>`;
+    }).join('')}
+  </div>`;
+}
+
+function searchInst(q){
+  state._instSearch = q;
+  const wrap = document.getElementById('srch-inst-wrap');
+  if(!wrap) return;
+  const term = (q||'').trim();
+  if(!term){ wrap.innerHTML=''; return; }
+  const matches = INSTITUTIONS.filter(i=>i.includes(term)).slice(0,30);
+  wrap.innerHTML = matches.length ? `<div class="inst-dropdown" style="position:absolute">
+    ${matches.map(i=>`<div class="inst-option" onclick="pickInstSearch('${i.replace(/'/g,"\\'")}')">${i.replace(term,`<mark>${term}</mark>`)}</div>`).join('')}
+  </div>` : '';
+}
+function pickInstSearch(name){
+  state._instSearch = name;
+  document.getElementById('srch-inst').value = name;
+  document.getElementById('srch-inst-wrap').innerHTML = '';
+  setState({_inst:name});
+}
+
+function pickInstitution(name){
+  document.getElementById('ob-inst-search').value = name;
+  state.user.institution = name;
+  const dd = document.getElementById('inst-dropdown');
+  if(dd) dd.remove();
+}
+
+function saveOnboardStep(step){
+  if(step===1){
+    state.user.city = document.getElementById('ob-city').value.trim();
+    const instInput = document.getElementById('ob-inst-search').value.trim();
+    state.user.institution = instInput;
+    if(!state.user.city||!state.user.institution){alert('נא למלא עיר ומוסד');return}
+  }
+  state.onboardStep = step+1;
+  setState({});
+}
+
+function prevStep(){
+  state.onboardStep = Math.max(1,(state.onboardStep||1)-1);
+  setState({});
+}
+
+function finishOnboarding(){
+  state.user.bio = document.getElementById('ob-bio').value.trim();
+  const m = document.getElementById('ob-masechet');
+  if(m) state.user.masechet = m.value.trim();
+  state.onboarded = true;
+  state.view = 'home';
+  setState({});
+  setTimeout(()=>toast('🎉 הפרופיל נוצר בהצלחה!'),100);
+}
+
+function openPerson(id){
+  state.selectedPerson = id;
+  go('person');
+}
+
+function openChat(id){
+  state.activeChat = id;
+  go('chat');
+}
+
+function startChat(personId){
+  state.activeChat = personId;
+  if(!CHATS.find(c=>c.personId===personId)){
+    CHATS.unshift({personId,messages:[],unread:0,lastTime:'עכשיו'});
+  }
+  go('chat');
+}
+
+function sendMsg(){
+  const input = document.getElementById('msg-input');
+  const text = input.value.trim();
+  if(!text) return;
+  const chat = CHATS.find(c=>c.personId===state.activeChat);
+  if(chat){
+    const time = new Date().toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
+    chat.messages.push({from:'me',text,time});
+    chat.lastTime = time;
+    input.value = '';
+    render();
+    // Simulate response
+    setTimeout(()=>{
+      const replies = ['תודה על ההודעה!','בהחלט, נשמע מצוין','אני אחזור אליך בקרוב','מעולה, נדבר על זה'];
+      chat.messages.push({from:'them',text:replies[Math.floor(Math.random()*replies.length)],time:new Date().toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})});
+      render();
+    },1500);
+  }
+}
+
+function setFilter(key,val){
+  state.filters[key] = state.filters[key]===val?'all':val;
+  setState({});
+}
+
+function filterMatches(p){
+  const f = state.filters;
+  if(!p.lookingNow) return false;
+  if(state.user.gender && p.gender!==state.user.gender) return false;
+  if(f.subject!=='all' && !p.subjects.includes(f.subject)) return false;
+  if(f.level!=='all' && p.level!==f.level) return false;
+  if(f.format!=='all' && p.format!==f.format && p.format!=='שניהם') return false;
+  if(f.lookingType && f.lookingType!=='all' && p.lookingType!==f.lookingType) return false;
+  return true;
+}
+
+function toggleLookingNow(){
+  if(!state.user.lookingNow){
+    requestLocationThenOpen();
+  } else {
+    state.user.lookingNow = false;
+    state.user.lookingType = '';
+    saveState();
+    unpublishFromFirebase();
+    render();
+    toast('🔕 כובה — אינך מופיע יותר בחיפוש');
+  }
+}
+
+function shareApp(){
+  const url = location.href;
+  const text = `הצטרף אליי ל-ChavrutaConnect — נמצא חברותא יחד! ${url}`;
+  if(navigator.share){
+    navigator.share({title:'ChavrutaConnect',text,url}).catch(()=>fallbackCopy(url));
+  } else {
+    fallbackCopy(url);
+  }
+}
+function fallbackCopy(text){
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(
+      ()=>toast('🔗 הקישור הועתק! שלח לחבר ב-WhatsApp'),
+      ()=>legacyCopy(text)
+    );
+  } else legacyCopy(text);
+}
+function legacyCopy(text){
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
+  document.body.appendChild(ta); ta.select();
+  try{ document.execCommand('copy'); toast('🔗 הועתק!'); }
+  catch(e){ prompt('העתק את הקישור:',text); }
+  ta.remove();
+}
+
+// Haversine formula — מרחק בק"מ בין שתי נקודות על כדור הארץ
+function haversine(lat1,lng1,lat2,lng2){
+  const R = 6371; // רדיוס כדור הארץ בק"מ
+  const toRad = d => d*Math.PI/180;
+  const dLat = toRad(lat2-lat1);
+  const dLng = toRad(lng2-lng1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLng/2)**2;
+  return Math.round(R * 2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)) * 10)/10;
+}
+
+function requestLocationThenOpen(){
+  if(!navigator.geolocation){
+    alert('הדפדפן שלך לא תומך באיתור מיקום');
+    return;
+  }
+  toast('📍 מבקש גישה למיקום...');
+  navigator.geolocation.getCurrentPosition(
+    (pos)=>{
+      state.user.lat = pos.coords.latitude;
+      state.user.lng = pos.coords.longitude;
+      state.user.locationUpdated = new Date().toISOString();
+      // עדכון מרחקים של כולם ביחס למיקום החדש
+      PEOPLE.forEach(p=>{
+        p.distance = haversine(state.user.lat,state.user.lng,p.lat,p.lng);
+      });
+      saveState();
+      toast(`✅ מיקום עודכן (דיוק: ${Math.round(pos.coords.accuracy)}מ')`);
+      showLookingModal();
+    },
+    (err)=>{
+      const msgs = {1:'גישה נדחתה — אפשר במכשיר',2:'מיקום לא זמין',3:'תם הזמן — נסה שוב'};
+      alert('שגיאת מיקום: '+(msgs[err.code]||err.message)+'\n\nממשיך עם מיקום ברירת מחדל (ירושלים).');
+      state.user.lat = 31.7857;
+      state.user.lng = 35.2007;
+      saveState();
+      showLookingModal();
+    },
+    {enableHighAccuracy:true,timeout:10000,maximumAge:300000}
+  );
+}
+
+function showLookingModal(){
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.onclick = (e)=>{ if(e.target===overlay) overlay.remove(); };
+  overlay.innerHTML = `
+    <div class="modal" onclick="event.stopPropagation()">
+      <h3>🟢 הפעלת מצב "מחפש חברותא"</h3>
+      <p style="text-align:center;font-size:13.5px;color:var(--ink-muted);margin-bottom:18px">
+        כשתפעיל — אחרים יוכלו למצוא אותך לפי מיקום ומוסד.<br>תוכל לכבות בכל רגע.
+      </p>
+      <div class="field">
+        <label>סוג חברותא שאתה מחפש</label>
+        <div class="chips" id="look-type">
+          <div class="chip active" onclick="document.querySelectorAll('#look-type .chip').forEach(c=>c.classList.remove('active'));this.classList.add('active');">קבוע</div>
+          <div class="chip" onclick="document.querySelectorAll('#look-type .chip').forEach(c=>c.classList.remove('active'));this.classList.add('active');">חד-פעמי</div>
+          <div class="chip" onclick="document.querySelectorAll('#look-type .chip').forEach(c=>c.classList.remove('active'));this.classList.add('active');">השלמת מניין/חבורה</div>
+        </div>
+      </div>
+      <div class="field">
+        <label>למשך כמה זמן?</label>
+        <div class="chips" id="look-dur">
+          <div class="chip" onclick="document.querySelectorAll('#look-dur .chip').forEach(c=>c.classList.remove('active'));this.classList.add('active');">30 דק'</div>
+          <div class="chip active" onclick="document.querySelectorAll('#look-dur .chip').forEach(c=>c.classList.remove('active'));this.classList.add('active');">שעה</div>
+          <div class="chip" onclick="document.querySelectorAll('#look-dur .chip').forEach(c=>c.classList.remove('active'));this.classList.add('active');">היום כולו</div>
+          <div class="chip" onclick="document.querySelectorAll('#look-dur .chip').forEach(c=>c.classList.remove('active'));this.classList.add('active');">תמידי</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:8px">
+        <button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">ביטול</button>
+        <button class="btn btn-primary" onclick="confirmLooking(this)">הפעל</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+
+function confirmLooking(btn){
+  const type = document.querySelector('#look-type .chip.active').textContent;
+  state.user.lookingNow = true;
+  state.user.lookingType = type;
+  saveState();
+  btn.closest('.modal-overlay').remove();
+  publishToFirebase();
+  render();
+  toast(window.FIREBASE_ENABLED ? '🟢 אתה מופיע עכשיו לכל המחפשים!' : '🟢 הופעל (מצב לוקאלי — ראה הוראות Firebase)');
+}
+
+// ============================================================
+// FIREBASE — שיתוף משתמשים בזמן אמת בין מכשירים
+// ============================================================
+function getMyId(){
+  let id = localStorage.getItem('chavrutaUserId');
+  if(!id){
+    id = 'u_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
+    localStorage.setItem('chavrutaUserId',id);
+  }
+  return id;
+}
+
+async function publishToFirebase(){
+  if(!window.FIREBASE_ENABLED) return;
+  const u = state.user;
+  if(!u.lookingNow){ await unpublishFromFirebase(); return; }
+  try{
+    const { doc, setDoc, serverTimestamp } = window._fb;
+    await setDoc(doc(window._db,'activeUsers',getMyId()),{
+      id: getMyId(),
+      name: u.name,
+      gender: u.gender || 'm',
+      age: u.age || 25,
+      city: u.city,
+      institution: u.institution,
+      subjects: u.subjects,
+      level: u.level,
+      lang: Array.isArray(u.lang)?u.lang.join(', '):u.lang,
+      format: u.format,
+      availability: Array.isArray(u.availability)?u.availability.join(', '):u.availability,
+      bio: u.bio,
+      lat: u.lat,
+      lng: u.lng,
+      lookingNow: true,
+      lookingType: u.lookingType,
+      updatedAt: serverTimestamp()
+    });
+    console.log('[Firebase] נרשם בהצלחה');
+  }catch(e){ console.error('[Firebase] שגיאה:',e); }
+}
+
+async function unpublishFromFirebase(){
+  if(!window.FIREBASE_ENABLED) return;
+  try{
+    const { doc, deleteDoc } = window._fb;
+    await deleteDoc(doc(window._db,'activeUsers',getMyId()));
+  }catch(e){ console.error(e); }
+}
+
+function startListeningForUsers(){
+  if(!window.FIREBASE_ENABLED) return;
+  const { collection, onSnapshot } = window._fb;
+  onSnapshot(collection(window._db,'activeUsers'),(snap)=>{
+    const others = [];
+    snap.forEach(d=>{
+      const data = d.data();
+      if(data.id === getMyId()) return; // לא אני
+      // חישוב מרחק
+      let distance = null;
+      if(state.user.lat && data.lat){
+        distance = haversine(state.user.lat,state.user.lng,data.lat,data.lng);
+      }
+      others.push({
+        ...data,
+        subjects: data.subjects||[],
+        distance: distance!==null ? distance : 999,
+        match: 70 + Math.floor(Math.random()*25) // אלגוריתם בסיסי
+      });
+    });
+    PEOPLE = others;
+    if(state.authenticated && state.onboarded) render();
+    console.log(`[Firebase] ${others.length} משתמשים פעילים`);
+  });
+}
+
+// תזמון יציאה אוטומטית כשסוגרים את החלון
+window.addEventListener('beforeunload',()=>{
+  if(state.user.lookingNow) unpublishFromFirebase();
+});
+
+function refreshLocation(){
+  if(!navigator.geolocation){alert('הדפדפן לא תומך באיתור');return}
+  toast('📍 מעדכן מיקום...');
+  navigator.geolocation.getCurrentPosition(
+    (pos)=>{
+      state.user.lat = pos.coords.latitude;
+      state.user.lng = pos.coords.longitude;
+      state.user.locationUpdated = new Date().toISOString();
+      PEOPLE.forEach(p=>{
+        p.distance = haversine(state.user.lat,state.user.lng,p.lat,p.lng);
+      });
+      saveState();
+      render();
+      toast(`✅ מיקום עודכן (דיוק ${Math.round(pos.coords.accuracy)}מ')`);
+    },
+    (err)=>toast('❌ לא ניתן לאתר מיקום')
+  );
+}
+
+function updateRadius(v){
+  state.radius = parseInt(v);
+  saveState();
+  // Just update the visible label and list without re-rendering map
+  document.querySelector('.radius-label b').textContent = v + ' ק״מ';
+  const filtered = PEOPLE.filter(p=>p.distance<=state.radius && filterMatches(p));
+  const listSection = document.querySelector('.section .card-list');
+  if(listSection){
+    listSection.innerHTML = filtered.length
+      ? filtered.sort((a,b)=>a.distance-b.distance).map(p=>renderPersonCard(p,true)).join('')
+      : '';
+    document.querySelector('.section-title span').textContent = `${filtered.length} חברותות בטווח`;
+  }
+  // Update map circle
+  if(window._mapCircle){
+    window._mapCircle.setRadius(state.radius*1000);
+  }
+}
+
+let _map;
+function initMap(){
+  setTimeout(()=>{
+    const center = (state.user.lat && state.user.lng)
+      ? [state.user.lat,state.user.lng]
+      : [31.7857,35.2007]; // ברירת מחדל: ירושלים
+    if(_map){_map.remove()}
+    _map = L.map('map',{zoomControl:false}).setView(center,11);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+      attribution:'© OpenStreetMap',maxZoom:18
+    }).addTo(_map);
+    L.control.zoom({position:'topleft'}).addTo(_map);
+    // User marker
+    L.marker(center,{
+      icon:L.divIcon({html:'<div style="background:linear-gradient(135deg,#c9a55c,#a8853f);width:18px;height:18px;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.3)"></div>',className:'',iconSize:[18,18]})
+    }).addTo(_map).bindPopup('המיקום שלך');
+    // Radius circle
+    window._mapCircle = L.circle(center,{radius:state.radius*1000,color:'#c9a55c',fillColor:'#c9a55c',fillOpacity:.1,weight:2}).addTo(_map);
+    // People markers
+    PEOPLE.forEach(p=>{
+      L.marker([p.lat,p.lng],{
+        icon:L.divIcon({html:`<div style="background:#1a2440;color:#c9a55c;padding:4px 8px;border-radius:8px;font-size:11px;font-weight:700;box-shadow:0 2px 6px rgba(0,0,0,.25);white-space:nowrap">${p.name.split(' ')[0]}</div>`,className:'',iconSize:[80,24]})
+      }).addTo(_map).on('click',()=>openPerson(p.id));
+    });
+  },50);
+}
+
+function toast(msg){
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(),3000);
+}
+
+// INIT
+function bootstrap(){
+  render();
+  // התחלת האזנה למשתמשים פעילים אחרים
+  if(window.FIREBASE_ENABLED){
+    startListeningForUsers();
+    // אם המשתמש כבר מחפש מהרענון הקודם — פרסם מחדש
+    if(state.user.lookingNow && state.authenticated && state.onboarded){
+      publishToFirebase();
+    }
+  }
+}
+
+// המתנה לטעינת Firebase SDK (modules טוענים async)
+if(document.readyState==='complete') bootstrap();
+else window.addEventListener('load',()=>setTimeout(bootstrap,300));
+</script>
+</body>
+</html>
