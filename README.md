@@ -4,7 +4,7 @@
 
 ## 🌐 אתר חי
 
-**👉 https://chavruta-connect.pages.dev**
+**👉 https://david-sharfiyyan.github.io/chavruta-connect/**
 
 ## תכונות
 
@@ -20,7 +20,7 @@
 
 | שכבה | שירות |
 |------|-------|
-| Frontend Hosting | Cloudflare Pages |
+| Frontend Hosting | GitHub Pages |
 | Code Repository | GitHub |
 | Database | Firebase Firestore (project: `chavrutinder`) |
 | Maps | Leaflet.js + OpenStreetMap |
@@ -35,7 +35,7 @@ git commit -m "תיאור השינוי"
 git push
 ```
 
-Cloudflare Pages יעדכן את האתר אוטומטית תוך ~דקה.
+GitHub Pages יעדכן את האתר אוטומטית תוך ~דקה-שתיים.
 
 ## מבנה הקוד
 
