@@ -2,6 +2,10 @@
 
 פלטפורמה למציאת חברותא ללימוד תורה — Tinder for Torah study partners.
 
+## 🌐 אתר חי
+
+**👉 https://chavruta-connect.pages.dev**
+
 ## תכונות
 
 - 🟢 **כפתור "מחפש חברותא עכשיו"** — הופעת פרופיל בזמן אמת לפי בקשה
@@ -12,18 +16,32 @@
 - 🔥 **Firestore Backend** — סנכרון בזמן אמת בין מכשירים
 - 📱 **PWA-ready** — ניתן להוסיף למסך הבית בטלפון
 
-## הפעלה
+## ארכיטקטורה
 
-1. צור פרויקט Firebase ב-https://console.firebase.google.com/
-2. הפעל Firestore (Test mode)
-3. העתק את ה-Firebase config והדבק בקובץ `index.html` (חפש `YOUR_API_KEY_HERE`)
-4. העלה ל-Netlify Drop / Cloudflare Pages / GitHub Pages
+| שכבה | שירות |
+|------|-------|
+| Frontend Hosting | Cloudflare Pages |
+| Code Repository | GitHub |
+| Database | Firebase Firestore (project: `chavrutinder`) |
+| Maps | Leaflet.js + OpenStreetMap |
 
-## מבנה
+## עדכון האתר
 
-קובץ HTML יחיד עם:
+```bash
+cd C:\Users\rolan\Desktop\chavruta-deploy
+# ערוך את index.html
+git add -A
+git commit -m "תיאור השינוי"
+git push
+```
+
+Cloudflare Pages יעדכן את האתר אוטומטית תוך ~דקה.
+
+## מבנה הקוד
+
+קובץ HTML יחיד (`index.html`) עם:
 - Vanilla JavaScript (ללא frameworks)
-- Tailwind-style CSS
+- CSS inline
 - Leaflet.js למפות
 - Firebase Firestore SDK
 
